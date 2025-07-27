@@ -1,35 +1,38 @@
-# Stage 1: Browser and build tools installation
+# Stage 1: Browser, build tools and modern Rust installation
 FROM python:3.11.4-slim-bullseye AS install-browser
 
-# ----- system packages + modern Rust -----
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gnupg wget ca-certificates \
-        build-essential clang cmake pkg-config libssl-dev curl && \
-    # instala Rust estável (edition 2021) — perfil mínimo, sem prompts
-    curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain stable && \
-    # torna o cargo/rustc visível para o restante do build
-    echo 'export PATH=/root/.cargo/bin:$PATH' >> /etc/profile.d/rust.sh && \
-    . /root/.cargo/env && \
-    rustc --version && \
-    # repositório do Chrome
-    ARCH=$(dpkg --print-architecture) && \
-    wget -qO - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    echo "deb [arch=${ARCH}] http://dl.google.com/linux/chrome/deb/ stable main" \
-        > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends chromium chromium-driver firefox-esr && \
-    chromium --version && chromedriver --version && \
-    # Geckodriver
-    GECKO_ARCH=$(case ${ARCH} in amd64) echo "linux64" ;; arm64) echo "linux-aarch64" ;; *) echo "linux64" ;; esac) && \
-    wget https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz && \
-    tar -xvzf geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz && \
-    chmod +x geckodriver && mv geckodriver /usr/local/bin/ && \
-    rm geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz && \
-    rm -rf /var/lib/apt/lists/*    # limpeza
+        build-essential clang cmake pkg-config libssl-dev \
+        curl git ninja-build \
+    \
+    # ---- instala Rust (edition 2021+) ----
+    && curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain stable \
+    && echo 'export PATH=/root/.cargo/bin:$PATH' >> /etc/profile.d/rust.sh \
+    && . /root/.cargo/env \
+    && rustc --version \
+    \
+    # ---- repositório + instalação do Chrome/Chromedriver ----
+    && ARCH=$(dpkg --print-architecture) \
+    && wget -qO - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=${ARCH}] http://dl.google.com/linux/chrome/deb/ stable main" \
+         > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends chromium chromium-driver firefox-esr \
+    && chromium --version && chromedriver --version \
+    \
+    # ---- Geckodriver ----
+    && GECKO_ARCH=$(case ${ARCH} in amd64) echo "linux64" ;; arm64) echo "linux-aarch64" ;; *) echo "linux64" ;; esac) \
+    && wget https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz \
+    && tar -xvzf geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz \
+    && chmod +x geckodriver && mv geckodriver /usr/local/bin/ \
+    && rm geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz \
+    \
+    # ---- limpeza ----
+    && rm -rf /var/lib/apt/lists/*
 
-ENV PATH=/root/.cargo/bin:${PATH}  
-# garante visibilidade em todos os estágios
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Stage 2: Python dependencies installation
 FROM install-browser AS gpt-researcher-install
