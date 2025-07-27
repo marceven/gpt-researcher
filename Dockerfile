@@ -2,23 +2,37 @@
 #FROM python:3.13.3-slim-bookworm AS install-browser
 FROM python:3.11.4-slim-bullseye AS install-browser
 
-# Install Chromium, Chromedriver, Firefox, Geckodriver, and build tools in one layer
+# Install Chromium, Chromedriver, Firefox, Geckodriver,
+# **e** o toolchain necessário para compilar wheels nativas (ARM)
 RUN apt-get update \
-    && apt-get install -y gnupg wget ca-certificates --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
+        gnupg wget ca-certificates \
+        build-essential clang cmake pkg-config libssl-dev cargo rustc \
+    \
+    # ----- adicionar repositório do Chrome ----- \
     && ARCH=$(dpkg --print-architecture) \
     && wget -qO - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=${ARCH}] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && echo "deb [arch=${ARCH}] http://dl.google.com/linux/chrome/deb/ stable main" \
+       > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
-    && apt-get install -y chromium chromium-driver \
+    \
+    # ----- Chrome + Chromedriver ----- \
+    && apt-get install -y --no-install-recommends chromium chromium-driver \
     && chromium --version && chromedriver --version \
-    && apt-get install -y --no-install-recommends firefox-esr build-essential \
+    \
+    # ----- Firefox ----- \
+    && apt-get install -y --no-install-recommends firefox-esr \
+    \
+    # ----- Geckodriver ----- \
     && GECKO_ARCH=$(case ${ARCH} in amd64) echo "linux64" ;; arm64) echo "linux-aarch64" ;; *) echo "linux64" ;; esac) \
     && wget https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz \
     && tar -xvzf geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz \
     && chmod +x geckodriver \
     && mv geckodriver /usr/local/bin/ \
     && rm geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz \
-    && rm -rf /var/lib/apt/lists/*  # Clean up apt lists to reduce image size
+    \
+    # ----- limpeza final ----- \
+    && rm -rf /var/lib/apt/lists/*  # Reduce image size
 
 # Stage 2: Python dependencies installation
 FROM install-browser AS gpt-researcher-install
@@ -33,6 +47,7 @@ COPY ./multi_agents/requirements.txt ./multi_agents/requirements.txt
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt --upgrade --prefer-binary && \
     pip install --no-cache-dir -r multi_agents/requirements.txt --upgrade --prefer-binary
+
 
 # Stage 3: Final stage with non-root user and app
 FROM gpt-researcher-install AS gpt-researcher
