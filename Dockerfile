@@ -28,7 +28,8 @@ RUN apt-get update && \
     rm geckodriver-v0.36.0-${GECKO_ARCH}.tar.gz && \
     rm -rf /var/lib/apt/lists/*    # limpeza
 
-ENV PATH=/root/.cargo/bin:${PATH}  # garante visibilidade em todos os estágios
+ENV PATH=/root/.cargo/bin:${PATH}  
+# garante visibilidade em todos os estágios
 
 # Stage 2: Python dependencies installation
 FROM install-browser AS gpt-researcher-install
